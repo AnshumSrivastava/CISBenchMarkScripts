@@ -11,6 +11,28 @@
     ]
   },
   {
+    "id": "SYS-002",
+    "title": "Kernel Core Dumps Restriction",
+    "category": "System",
+    "severity": "MEDIUM",
+    "expected": "fs.suid_dumpable = 0 in active sysctl and limits.conf hard core 0",
+    "remediation": "Set fs.suid_dumpable = 0 in /etc/sysctl.d/50-coredump.conf and reload with sysctl -p.",
+    "references": [
+      "CIS Linux Benchmark: Ensure core dumps are restricted"
+    ]
+  },
+  {
+    "id": "SYS-003",
+    "title": "Address Space Layout Randomization (ASLR) Enabled",
+    "category": "System",
+    "severity": "HIGH",
+    "expected": "kernel.randomize_va_space = 2 (Full ASLR)",
+    "remediation": "Set kernel.randomize_va_space = 2 in /etc/sysctl.d/50-aslr.conf and reload with sysctl -p.",
+    "references": [
+      "CIS Linux Benchmark: Ensure address space layout randomization (ASLR) is enabled"
+    ]
+  },
+  {
     "id": "ACC-001",
     "title": "Ensure UID 0 is Assigned Only to Root",
     "category": "Accounts",
@@ -44,6 +66,17 @@
     ]
   },
   {
+    "id": "ACC-004",
+    "title": "Default User Umask Configuration in Login Defs",
+    "category": "Accounts",
+    "severity": "MEDIUM",
+    "expected": "UMASK is configured to 027 or more restrictive (e.g., 077) in /etc/login.defs",
+    "remediation": "Set UMASK 027 in /etc/login.defs to prevent newly created files from being readable or writable by arbitrary users.",
+    "references": [
+      "CIS Linux Benchmark: Ensure default user umask is 027 or more restrictive"
+    ]
+  },
+  {
     "id": "PERM-001",
     "title": "Verify Core Account File Permissions (/etc/passwd, /etc/group)",
     "category": "Permissions",
@@ -63,6 +96,28 @@
     "remediation": "Run 'chmod 600 /etc/shadow' (or 640 if shadow group is used) and 'chown root:root /etc/shadow'.",
     "references": [
       "CIS Linux Benchmark: Permissions on /etc/shadow"
+    ]
+  },
+  {
+    "id": "PERM-003",
+    "title": "Sudoers Configuration File Permissions & Ownership",
+    "category": "Permissions",
+    "severity": "HIGH",
+    "expected": "Mode 0440 or 0400, owned by root:root on /etc/sudoers and /etc/sudoers.d/*",
+    "remediation": "Run 'chmod 0440 /etc/sudoers' and ensure ownership is root:root.",
+    "references": [
+      "CIS Linux Benchmark: Ensure permissions on /etc/sudoers are configured"
+    ]
+  },
+  {
+    "id": "PERM-004",
+    "title": "World-Writable Files Inspection in Sensitive Paths",
+    "category": "Permissions",
+    "severity": "HIGH",
+    "expected": "No world-writable files in /etc or /var/log",
+    "remediation": "Inspect world-writable files using find and remove the other write bit: chmod o-w <file>.",
+    "references": [
+      "CIS Linux Benchmark: Ensure no world-writable files exist in system configuration directories"
     ]
   },
   {
@@ -88,6 +143,28 @@
     ]
   },
   {
+    "id": "SSH-003",
+    "title": "SSH Idle Timeout and KeepAlive Configuration",
+    "category": "SSH",
+    "severity": "LOW",
+    "expected": "ClientAliveInterval between 1 and 300, ClientAliveCountMax <= 3",
+    "remediation": "Set 'ClientAliveInterval 300' and 'ClientAliveCountMax 3' in sshd configuration, then reload sshd.",
+    "references": [
+      "CIS Linux Benchmark: Ensure SSH ClientAliveInterval and ClientAliveCountMax are configured"
+    ]
+  },
+  {
+    "id": "SSH-004",
+    "title": "SSH Maximum Authentication Tries Restriction",
+    "category": "SSH",
+    "severity": "MEDIUM",
+    "expected": "MaxAuthTries <= 4",
+    "remediation": "Set 'MaxAuthTries 4' in /etc/ssh/sshd_config to prevent brute-force attempts in a single session.",
+    "references": [
+      "CIS Linux Benchmark: Ensure SSH MaxAuthTries is configured"
+    ]
+  },
+  {
     "id": "NET-001",
     "title": "Inspect Listening Network Ports & Services",
     "category": "Network",
@@ -96,6 +173,28 @@
     "remediation": "Review listening sockets with 'ss -tulpen' or 'netstat' and stop/disable unneeded background services using the platform service manager.",
     "references": [
       "CIS Linux Benchmark: Ensure unnecessary services are disabled"
+    ]
+  },
+  {
+    "id": "NET-002",
+    "title": "IPv4 Forwarding Disabled",
+    "category": "Network",
+    "severity": "MEDIUM",
+    "expected": "net.ipv4.ip_forward = 0 unless server operates as a dedicated router/gateway",
+    "remediation": "Set net.ipv4.ip_forward = 0 in /etc/sysctl.d/50-netforward.conf and reload with sysctl -p.",
+    "references": [
+      "CIS Linux Benchmark: Ensure IP forwarding is disabled"
+    ]
+  },
+  {
+    "id": "NET-003",
+    "title": "ICMP Redirect Acceptance Disabled",
+    "category": "Network",
+    "severity": "MEDIUM",
+    "expected": "net.ipv4.conf.all.accept_redirects = 0 and net.ipv4.conf.default.accept_redirects = 0",
+    "remediation": "Disable ICMP redirects in /etc/sysctl.d/50-redirects.conf to protect against malicious route poisoning.",
+    "references": [
+      "CIS Linux Benchmark: Ensure packet redirect sending and acceptance is disabled"
     ]
   },
   {

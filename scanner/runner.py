@@ -2,31 +2,63 @@ import traceback
 from typing import List, Callable
 from scanner.models import Finding, SystemContext
 from scanner.checks import (
+    # System
     check_sys_001,
+    check_sys_002_core_dumps,
+    check_sys_003_aslr,
+    # Accounts
     check_acc_001_uid_zero,
     check_acc_002_empty_passwords,
     check_acc_003_password_ageing,
+    check_acc_004_umask,
+    # Permissions
     check_perm_001_core_account_files,
     check_perm_002_shadow_permissions,
+    check_perm_003_sudoers,
+    check_perm_004_world_writable,
+    # SSH
     check_ssh_001_root_login,
     check_ssh_002_password_auth,
+    check_ssh_003_timeouts,
+    check_ssh_004_max_auth_tries,
+    # Network
     check_net_001_listeners,
+    check_net_002_ip_forward,
+    check_net_003_icmp_redirects,
+    # Firewall
     check_fw_001_firewall,
+    # Logs
     check_log_001_auth_failures,
     check_log_002_auth_success
 )
 
 REGISTERED_CHECKS: List[Callable[[SystemContext], Finding]] = [
+    # Category: System
     check_sys_001,
+    check_sys_002_core_dumps,
+    check_sys_003_aslr,
+    # Category: Accounts
     check_acc_001_uid_zero,
     check_acc_002_empty_passwords,
     check_acc_003_password_ageing,
+    check_acc_004_umask,
+    # Category: Permissions
     check_perm_001_core_account_files,
     check_perm_002_shadow_permissions,
+    check_perm_003_sudoers,
+    check_perm_004_world_writable,
+    # Category: SSH
     check_ssh_001_root_login,
     check_ssh_002_password_auth,
+    check_ssh_003_timeouts,
+    check_ssh_004_max_auth_tries,
+    # Category: Network
     check_net_001_listeners,
+    check_net_002_ip_forward,
+    check_net_003_icmp_redirects,
+    # Category: Firewall
     check_fw_001_firewall,
+    # Category: Logs
     check_log_001_auth_failures,
     check_log_002_auth_success
 ]

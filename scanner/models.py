@@ -31,8 +31,8 @@ class SystemContext:
     init_system: str
     logging_mechanism: str
     available_tools: Dict[str, bool]
-    auth_log_path: Optional[str]
-    sshd_config_path: Optional[str]
+    auth_log_path: Optional[str] = None
+    sshd_config_path: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

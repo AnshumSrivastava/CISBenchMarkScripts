@@ -142,6 +142,112 @@ REMEDIATION_DATABASE: Dict[str, Dict[str, Any]] = {
         ],
         "safe_command": "last -n 20",
         "warning": "None - audit only."
+    },
+    "SYS-002": {
+        "title": "Kernel Core Dumps Restriction",
+        "action": "Disable core dumps for setuid executables to prevent memory leakage.",
+        "steps": [
+            "Create or edit /etc/sysctl.d/50-coredump.conf.",
+            "Add line: fs.suid_dumpable = 0",
+            "Reload sysctl settings: sudo sysctl -p /etc/sysctl.d/50-coredump.conf",
+            "Add '* hard core 0' to /etc/security/limits.conf if persistent user limits are desired."
+        ],
+        "safe_command": "sysctl fs.suid_dumpable",
+        "warning": "Disabling core dumps prevents developers from post-mortem debugging crashed programs on production nodes."
+    },
+    "SYS-003": {
+        "title": "Address Space Layout Randomization (ASLR)",
+        "action": "Enable full memory address space randomization.",
+        "steps": [
+            "Create or edit /etc/sysctl.d/50-aslr.conf.",
+            "Add line: kernel.randomize_va_space = 2",
+            "Apply immediately: sudo sysctl -w kernel.randomize_va_space=2",
+            "Verify effective setting: sysctl kernel.randomize_va_space"
+        ],
+        "safe_command": "sysctl kernel.randomize_va_space",
+        "warning": "None - full ASLR is the industry standard default across modern Linux kernels."
+    },
+    "ACC-004": {
+        "title": "Default User UMASK",
+        "action": "Enforce a restrictive default file creation mask (027 or 077).",
+        "steps": [
+            "Edit /etc/login.defs.",
+            "Set UMASK 027 (prevents group write and all permissions for other users).",
+            "Verify shell profile defaults (/etc/profile or /etc/bash.bashrc) do not override with 022."
+        ],
+        "safe_command": "grep -i '^UMASK' /etc/login.defs",
+        "warning": "A restrictive umask like 027 prevents other non-group users from reading newly created files; ensure shared folder group permissions are adjusted if needed."
+    },
+    "PERM-003": {
+        "title": "Sudoers File Permissions",
+        "action": "Enforce 0440 mode and root:root ownership on sudoers files.",
+        "steps": [
+            "Ensure ownership: sudo chown root:root /etc/sudoers /etc/sudoers.d/* 2>/dev/null",
+            "Set permissions: sudo chmod 0440 /etc/sudoers /etc/sudoers.d/* 2>/dev/null",
+            "Validate syntax before closing session: sudo visudo -c"
+        ],
+        "safe_command": "ls -l /etc/sudoers /etc/sudoers.d",
+        "warning": "Always use visudo -c to check syntax; corrupt sudoers files can prevent any sudo elevation."
+    },
+    "PERM-004": {
+        "title": "World-Writable Files in /etc",
+        "action": "Remove write permissions for others on configuration files.",
+        "steps": [
+            "Identify world-writable files: find /etc -xdev -type f -perm -0002",
+            "Remove other write bit: sudo chmod o-w <filename>",
+            "Verify file permissions with ls -l."
+        ],
+        "safe_command": "find /etc -maxdepth 3 -type f -perm -0002",
+        "warning": "Ensure symlinks to /tmp or shared sockets are not modified unintentionally."
+    },
+    "SSH-003": {
+        "title": "SSH Idle Timeout Configuration",
+        "action": "Enforce disconnect timeouts on idle SSH sessions.",
+        "steps": [
+            "Edit /etc/ssh/sshd_config (or /etc/ssh/sshd_config.d/timeout.conf).",
+            "Add: ClientAliveInterval 300",
+            "Add: ClientAliveCountMax 3",
+            "Test syntax: sudo sshd -t",
+            "Reload SSH daemon: sudo systemctl reload sshd"
+        ],
+        "safe_command": "sudo sshd -t",
+        "warning": "Active connections will terminate after 15 minutes of inactivity; adjust ClientAliveInterval to balance security and usability."
+    },
+    "SSH-004": {
+        "title": "SSH Max Authentication Tries",
+        "action": "Restrict per-connection authentication attempts to reduce brute-force effectiveness.",
+        "steps": [
+            "Edit /etc/ssh/sshd_config (or sshd_config.d/auth.conf).",
+            "Add: MaxAuthTries 4",
+            "Test syntax: sudo sshd -t",
+            "Reload SSH daemon: sudo systemctl reload sshd"
+        ],
+        "safe_command": "grep -i 'MaxAuthTries' /etc/ssh/sshd_config",
+        "warning": "If users have multiple SSH keys loaded in their agent, they may hit the 4-try limit before finding the right key. Configure IdentityFile in client configs if necessary."
+    },
+    "NET-002": {
+        "title": "IPv4 Forwarding",
+        "action": "Disable IPv4 packet forwarding on standard host systems.",
+        "steps": [
+            "Create /etc/sysctl.d/50-netforward.conf.",
+            "Add line: net.ipv4.ip_forward = 0",
+            "Apply immediately: sudo sysctl -w net.ipv4.ip_forward=0",
+            "Verify: sysctl net.ipv4.ip_forward"
+        ],
+        "safe_command": "sysctl net.ipv4.ip_forward",
+        "warning": "Do NOT disable if host is a VPN gateway, Docker/Kubernetes container host, or network router."
+    },
+    "NET-003": {
+        "title": "ICMP Redirect Acceptance",
+        "action": "Disable ICMP redirect acceptance to prevent malicious routing alterations.",
+        "steps": [
+            "Create /etc/sysctl.d/50-redirects.conf.",
+            "Add lines:\nnet.ipv4.conf.all.accept_redirects = 0\nnet.ipv4.conf.default.accept_redirects = 0",
+            "Apply: sudo sysctl -p /etc/sysctl.d/50-redirects.conf",
+            "Verify: sysctl net.ipv4.conf.all.accept_redirects"
+        ],
+        "safe_command": "sysctl net.ipv4.conf.all.accept_redirects",
+        "warning": "Disabling ICMP redirects may require static routes in complex multi-homed network topologies."
     }
 }
 

@@ -47,10 +47,14 @@ def cmd_audit(args: argparse.Namespace) -> None:
         "NOT_APPLICABLE": "\033[90m[N/A ]\033[0m"
     }
 
-    # Print live console output
+    # Print live console output grouped by category
+    current_cat = None
     for f in findings:
+        if f.category != current_cat:
+            current_cat = f.category
+            print(f"\n📂 \033[1;36mCategory: {current_cat}\033[0m")
         color_tag = STATUS_COLORS.get(f.status, f"[{f.status}]")
-        print(f"{color_tag} {f.id:<7} {f.title}")
+        print(f"  {color_tag} {f.id:<8} {f.title}")
 
     # Build report data
     report_data = build_report_data(ctx, findings)

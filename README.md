@@ -46,22 +46,67 @@ JSON Report          HTML Report
 
 ---
 
-## 📋 Implemented Checks
+## 📋 Implemented Checks (Organized by Category)
 
-| Check ID | Area | Check Title | Severity | Default Target Baseline |
+| Check ID | Category | Check Title | Severity | Default Target Baseline |
 | :--- | :--- | :--- | :--- | :--- |
 | **SYS-001** | System | System Identification & Inventory | INFO | Platform, OS, distribution ID, kernel & init |
+| **SYS-002** | System | Kernel Core Dumps Restriction | MEDIUM | `fs.suid_dumpable = 0` (prevent memory leakage) |
+| **SYS-003** | System | ASLR Randomization Enabled | HIGH | `kernel.randomize_va_space = 2` (full ASLR) |
 | **ACC-001** | Accounts | Ensure UID 0 is Assigned Only to Root | HIGH | Only `root` has UID 0 in `/etc/passwd` |
 | **ACC-002** | Accounts | Ensure No Accounts Have Empty Passwords | HIGH | No account in `/etc/shadow` has empty password hash |
 | **ACC-003** | Accounts | Verify Password Ageing Configuration | MEDIUM | `PASS_MAX_DAYS <= 90`, `PASS_MIN_DAYS >= 1` in `/etc/login.defs` |
+| **ACC-004** | Accounts | Default User Umask Configuration | MEDIUM | `UMASK 027` or more restrictive in `/etc/login.defs` |
 | **PERM-001**| Permissions | Core Account Files Permissions | MEDIUM | `/etc/passwd`, `/etc/group` mode `<= 0644`, owner `root:root` |
 | **PERM-002**| Permissions | Shadow File Permissions | HIGH | `/etc/shadow` mode `<= 0640` or `0600`, root/shadow owned |
+| **PERM-003**| Permissions | Sudoers Configuration Permissions | HIGH | `/etc/sudoers` mode `0440` or `0400`, owned by `root:root` |
+| **PERM-004**| Permissions | World-Writable Files Inspection | HIGH | No world-writable files in `/etc` |
 | **SSH-001** | SSH | SSH Direct Root Login Configuration | HIGH | `PermitRootLogin no` or `prohibit-password` |
 | **SSH-002** | SSH | SSH Password Authentication Configuration| MEDIUM | `PasswordAuthentication no` (keys preferred) |
+| **SSH-003** | SSH | SSH Session Idle Timeout & KeepAlive | LOW | `ClientAliveInterval 300` and `ClientAliveCountMax <= 3` |
+| **SSH-004** | SSH | SSH Maximum Authentication Tries | MEDIUM | `MaxAuthTries <= 4` |
 | **NET-001** | Network | Inspect Listening Network Sockets | MEDIUM | Non-loopback listening sockets cataloged via `ss` or `netstat` |
+| **NET-002** | Network | IPv4 Packet Forwarding Disabled | MEDIUM | `net.ipv4.ip_forward = 0` (unless dedicated router) |
+| **NET-003** | Network | ICMP Redirect Acceptance Disabled | MEDIUM | `net.ipv4.conf.all.accept_redirects = 0` |
 | **FW-001**  | Firewall | Detect Firewall Tool and Active State | HIGH | Active enforcement verified via `ufw`, `firewalld`, or `nft` |
 | **LOG-001** | Logs | Authentication Failures Monitoring | MEDIUM | Recent failed logins parsed from journald / `/var/log` |
 | **LOG-002** | Logs | Successful Authentication Audit | INFO | Recent user logins & sessions cataloged |
+
+---
+
+## 📂 Category-Specific Audit Scripts
+
+In addition to the unified Python engine, standalone POSIX Bash audit scripts are organized by category under `scripts/`:
+
+```
+scripts/
+├── collect_system.sh               # Root system & environment discovery script
+├── system/
+│   └── audit_system.sh            # OS, kernel, ASLR, and coredump inspector
+├── accounts/
+│   └── audit_accounts.sh          # UID 0, empty passwords, ageing, and umask
+├── permissions/
+│   └── audit_permissions.sh       # /etc/passwd, shadow, sudoers, world-writable
+├── ssh/
+│   └── audit_ssh.sh               # Root login, password auth, timeouts, max auth tries
+├── network/
+│   └── audit_network.sh           # Listening ports, IP forward, ICMP redirects
+├── firewall/
+│   └── audit_firewall.sh          # UFW, Firewalld, NFTables, IPTables enforcement
+└── logs/
+    └── audit_logs.sh              # Failed attempts, accepted sessions, logins
+```
+
+You can execute any individual category script directly without dependencies:
+```bash
+./scripts/system/audit_system.sh
+./scripts/accounts/audit_accounts.sh
+./scripts/permissions/audit_permissions.sh
+./scripts/ssh/audit_ssh.sh
+./scripts/network/audit_network.sh
+./scripts/firewall/audit_firewall.sh
+./scripts/logs/audit_logs.sh
+```
 
 ---
 

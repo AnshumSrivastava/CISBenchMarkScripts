@@ -67,6 +67,7 @@ def parse_login_defs_directive(text: str, directive: str) -> Optional[int]:
 # CHECK IMPLEMENTATIONS
 # -------------------------------------------------------------
 
+
 def check_sys_001(ctx: SystemContext) -> Finding:
     """SYS-001: System identification & inventory."""
     meta = load_check_meta("SYS-001")
@@ -91,6 +92,122 @@ def check_sys_001(ctx: SystemContext) -> Finding:
         remediation=meta["remediation"],
         references=meta["references"]
     )
+
+
+def read_sysctl_value(param_name: str) -> Optional[str]:
+    """Read sysctl parameter from /proc/sys or via sysctl command."""
+    proc_path = Path("/proc/sys") / param_name.replace(".", "/")
+    if proc_path.exists():
+        try:
+            return proc_path.read_text(encoding="utf-8").strip()
+        except Exception:
+            pass
+    if shutil.which("sysctl"):
+        try:
+            res = subprocess.run(["sysctl", "-n", param_name], capture_output=True, text=True, timeout=2)
+            if res.returncode == 0:
+                return res.stdout.strip()
+        except Exception:
+            pass
+    return None
+
+
+def check_sys_002_core_dumps(ctx: SystemContext) -> Finding:
+    """SYS-002: Kernel core dumps restriction."""
+    meta = load_check_meta("SYS-002")
+    val = read_sysctl_value("fs.suid_dumpable")
+
+    if val is None:
+        return Finding(
+            id="SYS-002",
+            title=meta["title"],
+            category=meta["category"],
+            severity=meta["severity"],
+            status="WARN",
+            description="Unable to query fs.suid_dumpable parameter.",
+            evidence="Neither /proc/sys/fs/suid_dumpable nor sysctl utility was accessible.",
+            expected=meta["expected"],
+            remediation=meta["remediation"],
+            references=meta["references"]
+        )
+
+    evidence = f"Effective fs.suid_dumpable: {val}"
+    if val == "0":
+        return Finding(
+            id="SYS-002",
+            title=meta["title"],
+            category=meta["category"],
+            severity=meta["severity"],
+            status="PASS",
+            description="Kernel core dumps for setuid executables are disabled.",
+            evidence=evidence,
+            expected=meta["expected"],
+            remediation=meta["remediation"],
+            references=meta["references"]
+        )
+    else:
+        return Finding(
+            id="SYS-002",
+            title=meta["title"],
+            category=meta["category"],
+            severity=meta["severity"],
+            status="FAIL",
+            description="Kernel core dumps for setuid programs are enabled (may leak memory contents).",
+            evidence=evidence,
+            expected=meta["expected"],
+            remediation=meta["remediation"],
+            references=meta["references"]
+        )
+
+
+def check_sys_003_aslr(ctx: SystemContext) -> Finding:
+    """SYS-003: Address Space Layout Randomization (ASLR) check."""
+    meta = load_check_meta("SYS-003")
+    val = read_sysctl_value("kernel.randomize_va_space")
+
+    if val is None:
+        return Finding(
+            id="SYS-003",
+            title=meta["title"],
+            category=meta["category"],
+            severity=meta["severity"],
+            status="WARN",
+            description="Unable to inspect kernel.randomize_va_space.",
+            evidence="kernel.randomize_va_space could not be read.",
+            expected=meta["expected"],
+            remediation=meta["remediation"],
+            references=meta["references"]
+        )
+
+    evidence = f"Effective kernel.randomize_va_space: {val}"
+    if val == "2":
+        return Finding(
+            id="SYS-003",
+            title=meta["title"],
+            category=meta["category"],
+            severity=meta["severity"],
+            status="PASS",
+            description="Full Address Space Layout Randomization (ASLR) is enabled.",
+            evidence=evidence,
+            expected=meta["expected"],
+            remediation=meta["remediation"],
+            references=meta["references"]
+        )
+    else:
+        status = "FAIL" if val in ["0", "1"] else "WARN"
+        return Finding(
+            id="SYS-003",
+            title=meta["title"],
+            category=meta["category"],
+            severity=meta["severity"],
+            status=status,
+            description="ASLR is not configured to full randomization mode (value 2 expected).",
+            evidence=evidence,
+            expected=meta["expected"],
+            remediation=meta["remediation"],
+            references=meta["references"]
+        )
+
 
 
 def check_acc_001_uid_zero(ctx: SystemContext) -> Finding:
@@ -320,6 +437,112 @@ def check_acc_003_password_ageing(ctx: SystemContext) -> Finding:
         )
 
 
+
+def check_acc_004_umask(ctx: SystemContext) -> Finding:
+    """ACC-004: Default UMASK in /etc/login.defs."""
+    meta = load_check_meta("ACC-004")
+    defs_path = Path("/etc/login.defs")
+    if not defs_path.exists():
+        return Finding(
+            id="ACC-004",
+            title=meta["title"],
+            category=meta["category"],
+            severity=meta["severity"],
+            status="NOT_APPLICABLE",
+            description="/etc/login.defs not found on this system.",
+            evidence="/etc/login.defs missing.",
+            expected=meta["expected"],
+            remediation=meta["remediation"],
+            references=meta["references"]
+        )
+
+    try:
+        content = defs_path.read_text(encoding="utf-8", errors="replace")
+    except PermissionError as e:
+        return Finding(
+            id="ACC-004",
+            title=meta["title"],
+            category=meta["category"],
+            severity=meta["severity"],
+            status="WARN",
+            description="Permission denied reading /etc/login.defs.",
+            evidence=str(e),
+            expected=meta["expected"],
+            remediation=meta["remediation"],
+            references=meta["references"]
+        )
+
+    # Search for UMASK
+    umask_val = None
+    for line in content.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) >= 2 and parts[0].upper() == "UMASK":
+            umask_val = parts[1]
+
+    if not umask_val:
+        return Finding(
+            id="ACC-004",
+            title=meta["title"],
+            category=meta["category"],
+            severity=meta["severity"],
+            status="WARN",
+            description="UMASK directive not explicitly set in /etc/login.defs.",
+            evidence="UMASK not configured.",
+            expected=meta["expected"],
+            remediation=meta["remediation"],
+            references=meta["references"]
+        )
+
+    evidence = f"Configured UMASK: {umask_val}"
+    try:
+        umask_int = int(umask_val, 8)
+        # Check if other and group write permissions are masked (at least 027)
+        # In 027 (octal 0o027): group write is masked (2), others all masked (7)
+        # If (umask_int & 0o027) == 0o027, then group-write and all-other are masked
+        if (umask_int & 0o027) == 0o027:
+            return Finding(
+                id="ACC-004",
+                title=meta["title"],
+                category=meta["category"],
+                severity=meta["severity"],
+                status="PASS",
+                description="Default user UMASK in /etc/login.defs is securely restrictive.",
+                evidence=evidence,
+                expected=meta["expected"],
+                remediation=meta["remediation"],
+                references=meta["references"]
+            )
+        else:
+            return Finding(
+                id="ACC-004",
+                title=meta["title"],
+                category=meta["category"],
+                severity=meta["severity"],
+                status="FAIL",
+                description="Default user UMASK is more permissive than recommended baseline 027.",
+                evidence=evidence,
+                expected=meta["expected"],
+                remediation=meta["remediation"],
+                references=meta["references"]
+            )
+    except ValueError:
+        return Finding(
+            id="ACC-004",
+            title=meta["title"],
+            category=meta["category"],
+            severity=meta["severity"],
+            status="WARN",
+            description=f"Invalid octal UMASK value encountered: {umask_val}",
+            evidence=evidence,
+            expected=meta["expected"],
+            remediation=meta["remediation"],
+            references=meta["references"]
+        )
+
+
 def check_perm_001_core_account_files(ctx: SystemContext) -> Finding:
     """PERM-001: Core account file permissions (/etc/passwd, /etc/group)."""
     meta = load_check_meta("PERM-001")
@@ -447,6 +670,138 @@ def check_perm_002_shadow_permissions(ctx: SystemContext) -> Finding:
         status="PASS",
         description="/etc/shadow has secure permissions and ownership.",
         evidence=evidence_text,
+        expected=meta["expected"],
+        remediation=meta["remediation"],
+        references=meta["references"]
+    )
+
+
+def check_perm_003_sudoers(ctx: SystemContext) -> Finding:
+    """PERM-003: Sudoers configuration file permissions & ownership."""
+    meta = load_check_meta("PERM-003")
+    sudoers_path = Path("/etc/sudoers")
+    if not sudoers_path.exists():
+        return Finding(
+            id="PERM-003",
+            title=meta["title"],
+            category=meta["category"],
+            severity=meta["severity"],
+            status="NOT_APPLICABLE",
+            description="/etc/sudoers file not present on this machine.",
+            evidence="/etc/sudoers does not exist.",
+            expected=meta["expected"],
+            remediation=meta["remediation"],
+            references=meta["references"]
+        )
+
+    targets = ["/etc/sudoers"]
+    sudoers_d = Path("/etc/sudoers.d")
+    if sudoers_d.is_dir():
+        try:
+            for item in sudoers_d.iterdir():
+                if item.is_file() and not item.name.startswith("."):
+                    targets.append(str(item))
+        except Exception:
+            pass
+
+    issues = []
+    details = []
+    for t in targets:
+        info = get_file_metadata(t)
+        if info["status"] == "ERROR":
+            details.append(f"{t}: {info['error']}")
+            issues.append(f"Unable to inspect {t} ({info['error']})")
+        elif info["status"] == "OK":
+            details.append(f"{t} (mode: {info['mode_str']} / {info['mode_octal']}, owner: {info['owner']}:{info['group']})")
+            if info["uid"] != 0:
+                issues.append(f"{t} owner is {info['owner']} (UID {info['uid']}), expected root (UID 0)")
+            if info["gid"] != 0:
+                issues.append(f"{t} group is {info['group']} (GID {info['gid']}), expected root (GID 0)")
+            if info.get("is_world_writable"):
+                issues.append(f"{t} is world-writable")
+            st_mode_val = int(info["mode_octal"], 8) & 0o777
+            # Baseline is 0440 (or 0400)
+            if is_permission_more_permissive(st_mode_val, 0o440):
+                issues.append(f"{t} mode {info['mode_octal']} is more permissive than 0440")
+
+    evidence_text = "\n".join(details)
+    if issues:
+        evidence_text += "\nIssues: " + "; ".join(issues)
+        return Finding(
+            id="PERM-003",
+            title=meta["title"],
+            category=meta["category"],
+            severity=meta["severity"],
+            status="FAIL",
+            description="Sudoers configuration permissions or ownership violate security baseline.",
+            evidence=evidence_text,
+            expected=meta["expected"],
+            remediation=meta["remediation"],
+            references=meta["references"]
+        )
+    return Finding(
+        id="PERM-003",
+        title=meta["title"],
+        category=meta["category"],
+        severity=meta["severity"],
+        status="PASS",
+        description="Sudoers configuration has compliant permissions (0440 or stricter) and root:root ownership.",
+        evidence=evidence_text,
+        expected=meta["expected"],
+        remediation=meta["remediation"],
+        references=meta["references"]
+    )
+
+
+def check_perm_004_world_writable(ctx: SystemContext) -> Finding:
+    """PERM-004: Detect world-writable files in sensitive paths (/etc)."""
+    meta = load_check_meta("PERM-004")
+    search_dirs = ["/etc"]
+    world_writable_found = []
+
+    for d in search_dirs:
+        dir_path = Path(d)
+        if not dir_path.is_dir():
+            continue
+        try:
+            for root, dirs, files in os.walk(d):
+                for fname in files:
+                    full_p = Path(root) / fname
+                    try:
+                        if not full_p.is_symlink():
+                            st = full_p.stat()
+                            if bool(st.st_mode & stat.S_IWOTH):
+                                world_writable_found.append(f"{full_p} (mode: {oct(st.st_mode & 0o777)})")
+                                if len(world_writable_found) >= 15:
+                                    break
+                    except Exception:
+                        continue
+                if len(world_writable_found) >= 15:
+                    break
+        except Exception as e:
+            pass
+
+    if world_writable_found:
+        return Finding(
+            id="PERM-004",
+            title=meta["title"],
+            category=meta["category"],
+            severity=meta["severity"],
+            status="FAIL",
+            description="Discovered world-writable files in /etc.",
+            evidence="World-writable files detected:\n" + "\n".join(world_writable_found),
+            expected=meta["expected"],
+            remediation=meta["remediation"],
+            references=meta["references"]
+        )
+    return Finding(
+        id="PERM-004",
+        title=meta["title"],
+        category=meta["category"],
+        severity=meta["severity"],
+        status="PASS",
+        description="No world-writable files discovered in /etc.",
+        evidence="Scanned /etc hierarchy; 0 world-writable regular files found.",
         expected=meta["expected"],
         remediation=meta["remediation"],
         references=meta["references"]
@@ -646,6 +1001,140 @@ def check_ssh_002_password_auth(ctx: SystemContext) -> Finding:
         )
 
 
+def check_ssh_003_timeouts(ctx: SystemContext) -> Finding:
+    """SSH-003: SSH ClientAliveInterval and ClientAliveCountMax."""
+    meta = load_check_meta("SSH-003")
+    config_info = read_effective_sshd_config(ctx)
+
+    if config_info.get("content") is None:
+        return Finding(
+            id="SSH-003",
+            title=meta["title"],
+            category=meta["category"],
+            severity=meta["severity"],
+            status="NOT_APPLICABLE",
+            description="OpenSSH daemon not detected on this system.",
+            evidence="No sshd configuration found.",
+            expected=meta["expected"],
+            remediation=meta["remediation"],
+            references=meta["references"]
+        )
+
+    interval_str = parse_directive(config_info["content"], "ClientAliveInterval")
+    count_str = parse_directive(config_info["content"], "ClientAliveCountMax")
+
+    evidence = f"ClientAliveInterval: {interval_str or 'Not set (0)'}, ClientAliveCountMax: {count_str or 'Not set (default 3)'}"
+
+    interval = None
+    count = None
+    if interval_str:
+        try:
+            interval = int(interval_str)
+        except ValueError:
+            pass
+    if count_str:
+        try:
+            count = int(count_str)
+        except ValueError:
+            pass
+
+    # CIS standard: ClientAliveInterval between 1 and 300, ClientAliveCountMax <= 3
+    if interval is not None and 1 <= interval <= 300 and (count is None or count <= 3):
+        return Finding(
+            id="SSH-003",
+            title=meta["title"],
+            category=meta["category"],
+            severity=meta["severity"],
+            status="PASS",
+            description="SSH idle timeout and keepalive configuration conforms to CIS recommendations.",
+            evidence=evidence,
+            expected=meta["expected"],
+            remediation=meta["remediation"],
+            references=meta["references"]
+        )
+    else:
+        return Finding(
+            id="SSH-003",
+            title=meta["title"],
+            category=meta["category"],
+            severity=meta["severity"],
+            status="WARN",
+            description="SSH session idle timeout is either unconfigured or exceeds 300 seconds.",
+            evidence=evidence,
+            expected=meta["expected"],
+            remediation=meta["remediation"],
+            references=meta["references"]
+        )
+
+
+def check_ssh_004_max_auth_tries(ctx: SystemContext) -> Finding:
+    """SSH-004: SSH MaxAuthTries limit."""
+    meta = load_check_meta("SSH-004")
+    config_info = read_effective_sshd_config(ctx)
+
+    if config_info.get("content") is None:
+        return Finding(
+            id="SSH-004",
+            title=meta["title"],
+            category=meta["category"],
+            severity=meta["severity"],
+            status="NOT_APPLICABLE",
+            description="OpenSSH daemon not detected on this system.",
+            evidence="No sshd configuration found.",
+            expected=meta["expected"],
+            remediation=meta["remediation"],
+            references=meta["references"]
+        )
+
+    val = parse_directive(config_info["content"], "MaxAuthTries")
+    evidence = f"Configured MaxAuthTries: {val or 'Not explicitly set (default 6)'}"
+
+    if val:
+        try:
+            tries = int(val)
+            if 1 <= tries <= 4:
+                return Finding(
+                    id="SSH-004",
+                    title=meta["title"],
+                    category=meta["category"],
+                    severity=meta["severity"],
+                    status="PASS",
+                    description=f"SSH MaxAuthTries is securely restricted to {tries}.",
+                    evidence=evidence,
+                    expected=meta["expected"],
+                    remediation=meta["remediation"],
+                    references=meta["references"]
+                )
+            else:
+                return Finding(
+                    id="SSH-004",
+                    title=meta["title"],
+                    category=meta["category"],
+                    severity=meta["severity"],
+                    status="FAIL",
+                    description=f"SSH MaxAuthTries ({tries}) exceeds CIS recommended limit of 4.",
+                    evidence=evidence,
+                    expected=meta["expected"],
+                    remediation=meta["remediation"],
+                    references=meta["references"]
+                )
+        except ValueError:
+            pass
+
+    return Finding(
+        id="SSH-004",
+        title=meta["title"],
+        category=meta["category"],
+        severity=meta["severity"],
+        status="WARN",
+        description="SSH MaxAuthTries is not explicitly set (defaults to 6 in OpenSSH).",
+        evidence=evidence,
+        expected=meta["expected"],
+        remediation=meta["remediation"],
+        references=meta["references"]
+    )
+
+
 def check_net_001_listeners(ctx: SystemContext) -> Finding:
     """NET-001: Inspect listening network ports & services."""
     meta = load_check_meta("NET-001")
@@ -714,6 +1203,104 @@ def check_net_001_listeners(ctx: SystemContext) -> Finding:
         remediation=meta["remediation"],
         references=meta["references"]
     )
+
+
+def check_net_002_ip_forward(ctx: SystemContext) -> Finding:
+    """NET-002: Check if IPv4 forwarding is disabled."""
+    meta = load_check_meta("NET-002")
+    val = read_sysctl_value("net.ipv4.ip_forward")
+
+    if val is None:
+        return Finding(
+            id="NET-002",
+            title=meta["title"],
+            category=meta["category"],
+            severity=meta["severity"],
+            status="WARN",
+            description="Unable to inspect net.ipv4.ip_forward.",
+            evidence="Parameter net.ipv4.ip_forward unreadable.",
+            expected=meta["expected"],
+            remediation=meta["remediation"],
+            references=meta["references"]
+        )
+
+    evidence = f"Effective net.ipv4.ip_forward: {val}"
+    if val == "0":
+        return Finding(
+            id="NET-002",
+            title=meta["title"],
+            category=meta["category"],
+            severity=meta["severity"],
+            status="PASS",
+            description="IPv4 forwarding is disabled (standard host mode).",
+            evidence=evidence,
+            expected=meta["expected"],
+            remediation=meta["remediation"],
+            references=meta["references"]
+        )
+    else:
+        return Finding(
+            id="NET-002",
+            title=meta["title"],
+            category=meta["category"],
+            severity=meta["severity"],
+            status="FAIL",
+            description="IPv4 forwarding is enabled on host (host operates as a router or gateway).",
+            evidence=evidence,
+            expected=meta["expected"],
+            remediation=meta["remediation"],
+            references=meta["references"]
+        )
+
+
+def check_net_003_icmp_redirects(ctx: SystemContext) -> Finding:
+    """NET-003: Check if ICMP redirect acceptance is disabled."""
+    meta = load_check_meta("NET-003")
+    val_all = read_sysctl_value("net.ipv4.conf.all.accept_redirects")
+    val_def = read_sysctl_value("net.ipv4.conf.default.accept_redirects")
+
+    evidence = f"net.ipv4.conf.all.accept_redirects: {val_all}, net.ipv4.conf.default.accept_redirects: {val_def}"
+
+    if val_all is None and val_def is None:
+        return Finding(
+            id="NET-003",
+            title=meta["title"],
+            category=meta["category"],
+            severity=meta["severity"],
+            status="WARN",
+            description="Unable to inspect ICMP redirect acceptance parameters.",
+            evidence=evidence,
+            expected=meta["expected"],
+            remediation=meta["remediation"],
+            references=meta["references"]
+        )
+
+    if val_all == "0" and (val_def is None or val_def == "0"):
+        return Finding(
+            id="NET-003",
+            title=meta["title"],
+            category=meta["category"],
+            severity=meta["severity"],
+            status="PASS",
+            description="ICMP redirect acceptance is disabled (guards against rogue route manipulation).",
+            evidence=evidence,
+            expected=meta["expected"],
+            remediation=meta["remediation"],
+            references=meta["references"]
+        )
+    else:
+        return Finding(
+            id="NET-003",
+            title=meta["title"],
+            category=meta["category"],
+            severity=meta["severity"],
+            status="FAIL",
+            description="ICMP redirect acceptance is enabled (system may accept forged routing updates).",
+            evidence=evidence,
+            expected=meta["expected"],
+            remediation=meta["remediation"],
+            references=meta["references"]
+        )
 
 
 def check_fw_001_firewall(ctx: SystemContext) -> Finding:

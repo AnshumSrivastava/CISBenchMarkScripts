@@ -18,9 +18,20 @@ def build_report_data(ctx: SystemContext, findings: List[Finding]) -> Dict[str, 
         "not_applicable": sum(1 for f in findings if f.status == "NOT_APPLICABLE"),
     }
 
-    # Sort findings: FAIL first, then WARN, then PASS, then NOT_APPLICABLE
-    status_order = {"FAIL": 0, "WARN": 1, "PASS": 2, "NOT_APPLICABLE": 3}
-    sorted_findings = sorted(findings, key=lambda f: status_order.get(f.status, 99))
+    # Category canonical order
+    category_order = {
+        "System": 1,
+        "Accounts": 2,
+        "Permissions": 3,
+        "SSH": 4,
+        "Network": 5,
+        "Firewall": 6,
+        "Logs": 7
+    }
+    sorted_findings = sorted(
+        findings,
+        key=lambda f: (category_order.get(f.category, 99), f.id)
+    )
 
     return {
         "scan": {
@@ -397,7 +408,7 @@ def render_html_report(report_data: Dict[str, Any], template_path: Optional[str]
         <div class="table-card">
             <div class="table-header">
                 <span>Security & Log Audit Findings</span>
-                <span style="font-size: 0.85rem; color: #94a3b8;">Prioritized: FAIL &rarr; WARN &rarr; PASS &rarr; N/A</span>
+                <span style="font-size: 0.85rem; color: #94a3b8;">Grouped by Category (System &bull; Accounts &bull; Permissions &bull; SSH &bull; Network &bull; Firewall &bull; Logs)</span>
             </div>
             <table>
                 <thead>
