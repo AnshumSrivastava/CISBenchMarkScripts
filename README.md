@@ -203,50 +203,92 @@ scripts/
 
 ---
 
-## 🚀 Quickstart & Usage
+## 🚀 Quickstart & CLI Interface
+
+The toolkit provides an all-in-one command-line interface via [`cli.py`](file:///mnt/projects/trialFinalModule1/cli.py) (or `python3 -m scanner.main`), supporting both rich subcommands and an interactive menu.
 
 ### 1. Requirements
 - Python 3.8+
-- Standard Linux utilities (any POSIX shell, optional: `ss`, `journalctl`, `ufw`, `nft`, etc.)
+- Standard POSIX utilities (`awk`, `grep`, `sed`, and optional utilities like `ss`, `journalctl`, `ufw`, `nft`, etc.)
 
 Install testing dependencies (optional):
 ```bash
 python3 -m pip install -r requirements.txt
 ```
 
-### 2. Environment Discovery
-Identify what tools and subsystems exist on the host machine:
+### 2. Interactive Terminal Dashboard
+Launch the interactive terminal interface:
 ```bash
-# Via Python:
-python3 -m scanner.main discover
+./cli.py
+# or explicitly:
+./cli.py --menu
+```
+This presents a menu to run audits, filter by category, list controls, run shell scripts, or inspect remediation guidance.
 
-# Or via pure Bash:
-./scripts/collect_system.sh
+### 3. Running Audits via CLI
+
+#### Full Audit (All 21 Checks Across All Categories)
+```bash
+./cli.py audit
+```
+*Generates console output and writes reports to `output/report.json` and `output/report.html`.*
+
+#### Category-Filtered Audit with Detailed Evidence
+```bash
+# Audit only SSH checks with full evidence and expected baseline:
+./cli.py audit --category ssh --verbose
+
+# Audit only Permissions checks:
+./cli.py audit --category permissions
+
+# Customize output targets:
+./cli.py audit --json-output myreport.json --html-output myreport.html
 ```
 
-### 3. Run Security & Log Audit
-Execute all 21 controls across all categories and generate JSON and HTML reports:
+### 4. Listing Registered Checks & Baselines
+List all 21 checks, their severity, categories, and titles:
 ```bash
-python3 -m scanner.main audit
-```
-Output files will be generated in `output/report.json` and `output/report.html`.
+# List all checks
+./cli.py list
 
-You can also specify custom output targets:
-```bash
-python3 -m scanner.main audit --json-output custom.json --html-output custom.html
+# List checks for a specific category
+./cli.py list --category accounts
 ```
 
-### 4. Regenerate HTML Report from Existing JSON
+### 5. Running Standalone Bash Category Scripts
+Run any category Bash script directly through the CLI entrypoint:
 ```bash
-python3 -m scanner.main report output/report.json --output-html output/report.html
+./cli.py script system
+./cli.py script accounts
+./cli.py script permissions
+./cli.py script ssh
+./cli.py script network
+./cli.py script firewall
+./cli.py script logs
+./cli.py script discovery
 ```
 
-### 5. Inspect Safe Remediation Guidance
-View non-destructive, step-by-step remediation procedures and warnings:
+### 6. Host Environment Discovery
+Scan the host platform, distribution, kernel, init system, and installed security tools:
 ```bash
-python3 -m scanner.main remediation --check SSH-001
-python3 -m scanner.main remediation --check ACC-002
-python3 -m scanner.main remediation --check PERM-001
+./cli.py discover
+```
+
+### 7. Inspect Safe Remediation Guidance
+View safe, non-destructive step-by-step instructions, warnings, and verification commands:
+```bash
+# List all available remediation guides:
+./cli.py remediation
+
+# View specific remediation guide:
+./cli.py remediation --check SSH-001
+./cli.py remediation --check ACC-002
+./cli.py remediation --check PERM-003
+```
+
+### 8. Regenerate HTML Dashboard from JSON
+```bash
+./cli.py report output/report.json --output-html output/report.html
 ```
 
 ---

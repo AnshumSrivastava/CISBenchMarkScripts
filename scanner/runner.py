@@ -1,5 +1,5 @@
 import traceback
-from typing import List, Callable
+from typing import List, Callable, Optional
 from scanner.models import Finding, SystemContext
 from scanner.checks import (
     # System
@@ -81,12 +81,16 @@ def make_safe_warning(check_fn_name: str, error_msg: str) -> Finding:
     )
 
 
-def run_all_checks(ctx: SystemContext) -> List[Finding]:
-    """Execute all registered checks sequentially and handle exceptions defensively."""
+def run_all_checks(ctx: SystemContext, category: Optional[str] = None) -> List[Finding]:
+    """Execute registered checks sequentially (or filtered by category) and handle exceptions defensively."""
     findings: List[Finding] = []
+    target_category = category.lower().strip() if category else None
+
     for check_fn in REGISTERED_CHECKS:
         try:
             finding = check_fn(ctx)
+            if target_category and finding.category.lower() != target_category:
+                continue
             findings.append(finding)
         except PermissionError as pe:
             findings.append(make_safe_warning(check_fn.__name__, f"Permission denied during check execution: {pe}"))

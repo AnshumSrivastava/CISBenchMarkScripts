@@ -92,3 +92,20 @@ def test_report_sorting_by_category():
     # Should sort: System -> Accounts -> SSH -> Logs
     assert reported_ids == ["SYS-001", "ACC-001", "SSH-001", "LOG-001"]
 
+
+def test_runner_category_filter():
+    from scanner.runner import run_all_checks
+    from scanner.discovery import discover_system
+
+    ctx = discover_system()
+    ssh_findings = run_all_checks(ctx, category="ssh")
+    assert len(ssh_findings) == 4
+    for f in ssh_findings:
+        assert f.category == "SSH"
+
+    sys_findings = run_all_checks(ctx, category="System")
+    assert len(sys_findings) == 3
+    for f in sys_findings:
+        assert f.category == "System"
+
+
