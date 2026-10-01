@@ -1,0 +1,134 @@
+[
+  {
+    "id": "SYS-001",
+    "title": "System Identification & Inventory",
+    "category": "System",
+    "severity": "INFO",
+    "expected": "Standard Linux OS, supported kernel, identified init and log system",
+    "remediation": "Review system inventory periodically to track supported OS and kernel versions.",
+    "references": [
+      "CIS Linux Benchmark - System Accounting and Identification"
+    ]
+  },
+  {
+    "id": "ACC-001",
+    "title": "Ensure UID 0 is Assigned Only to Root",
+    "category": "Accounts",
+    "severity": "HIGH",
+    "expected": "Only 'root' has UID 0",
+    "remediation": "Remove any secondary or rogue accounts with UID 0 in /etc/passwd or change their UID to a standard non-zero value.",
+    "references": [
+      "CIS Linux Benchmark: Ensure root is the only UID 0 account"
+    ]
+  },
+  {
+    "id": "ACC-002",
+    "title": "Ensure No Accounts Have Empty Password Fields",
+    "category": "Accounts",
+    "severity": "HIGH",
+    "expected": "No active accounts possess empty password hashes in /etc/shadow",
+    "remediation": "Lock empty accounts using 'passwd -l <user>' or set a strong password using 'passwd <user>'.",
+    "references": [
+      "CIS Linux Benchmark: Ensure password fields are not empty"
+    ]
+  },
+  {
+    "id": "ACC-003",
+    "title": "Verify Password Ageing Configuration",
+    "category": "Accounts",
+    "severity": "MEDIUM",
+    "expected": "PASS_MAX_DAYS <= 90 and PASS_MIN_DAYS >= 1 in /etc/login.defs",
+    "remediation": "Edit /etc/login.defs to enforce PASS_MAX_DAYS 90 and PASS_MIN_DAYS 1.",
+    "references": [
+      "CIS Linux Benchmark: Ensure password expiration is configured"
+    ]
+  },
+  {
+    "id": "PERM-001",
+    "title": "Verify Core Account File Permissions (/etc/passwd, /etc/group)",
+    "category": "Permissions",
+    "severity": "MEDIUM",
+    "expected": "Mode 0644 or more restrictive, owned by root:root",
+    "remediation": "Run 'chmod 644 /etc/passwd /etc/group' and 'chown root:root /etc/passwd /etc/group'.",
+    "references": [
+      "CIS Linux Benchmark: Permissions on /etc/passwd and /etc/group"
+    ]
+  },
+  {
+    "id": "PERM-002",
+    "title": "Verify Shadow File Permissions (/etc/shadow)",
+    "category": "Permissions",
+    "severity": "HIGH",
+    "expected": "Mode 0640 or 0600, owned by root:root or root:shadow",
+    "remediation": "Run 'chmod 600 /etc/shadow' (or 640 if shadow group is used) and 'chown root:root /etc/shadow'.",
+    "references": [
+      "CIS Linux Benchmark: Permissions on /etc/shadow"
+    ]
+  },
+  {
+    "id": "SSH-001",
+    "title": "Ensure Direct SSH Root Login is Disabled",
+    "category": "SSH",
+    "severity": "HIGH",
+    "expected": "PermitRootLogin no (or prohibit-password / without-password)",
+    "remediation": "Set 'PermitRootLogin no' in /etc/ssh/sshd_config (or /etc/ssh/sshd_config.d/), validate with 'sshd -t', and reload sshd.",
+    "references": [
+      "CIS Linux Benchmark: Ensure SSH root login is disabled"
+    ]
+  },
+  {
+    "id": "SSH-002",
+    "title": "Ensure SSH Password Authentication is Disabled",
+    "category": "SSH",
+    "severity": "MEDIUM",
+    "expected": "PasswordAuthentication no (public key authentication preferred)",
+    "remediation": "Set 'PasswordAuthentication no' in /etc/ssh/sshd_config (or sshd_config.d/), ensure public key authentication is configured, validate with 'sshd -t', and reload sshd.",
+    "references": [
+      "CIS Linux Benchmark: Ensure SSH PasswordAuthentication is disabled"
+    ]
+  },
+  {
+    "id": "NET-001",
+    "title": "Inspect Listening Network Ports & Services",
+    "category": "Network",
+    "severity": "MEDIUM",
+    "expected": "Only authorized listening TCP/UDP sockets and known services",
+    "remediation": "Review listening sockets with 'ss -tulpen' or 'netstat' and stop/disable unneeded background services using the platform service manager.",
+    "references": [
+      "CIS Linux Benchmark: Ensure unnecessary services are disabled"
+    ]
+  },
+  {
+    "id": "FW-001",
+    "title": "Detect Firewall Tool and Active Enforcement State",
+    "category": "Firewall",
+    "severity": "HIGH",
+    "expected": "An active firewall enforcement service (e.g. ufw active, firewalld running, or active nft/iptables rulesets)",
+    "remediation": "Enable and configure a supported firewall tool (e.g. 'ufw enable' or enable nftables / firewalld) ensuring SSH remains allowed.",
+    "references": [
+      "CIS Linux Benchmark: Ensure a firewall is installed and active"
+    ]
+  },
+  {
+    "id": "LOG-001",
+    "title": "Inspect Authentication Log for Failed Login Attempts",
+    "category": "Logs",
+    "severity": "MEDIUM",
+    "expected": "Recent failed logins identified or healthy log baseline",
+    "remediation": "Investigate recurring failed login sources and consider deploying Fail2ban or SSH rate limiting.",
+    "references": [
+      "CIS Linux Benchmark: Monitor authentication logs and audit failures"
+    ]
+  },
+  {
+    "id": "LOG-002",
+    "title": "Inspect Authentication Log for Successful Logins",
+    "category": "Logs",
+    "severity": "INFO",
+    "expected": "Recent authorized login events captured for accountability",
+    "remediation": "Verify all identified successful logins correspond to approved users and scheduled maintenance windows.",
+    "references": [
+      "CIS Linux Benchmark: Account log tracking and session audit"
+    ]
+  }
+]
